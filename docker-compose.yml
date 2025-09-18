@@ -1,0 +1,469 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    hostname: zookeeper
+    mem_limit: 512m
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes: 
+      - ./kafka/zookeeper_data/data:/var/lib/zookeeper/data
+      - ./kafka/zookeeper_data/log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    hostname: kafka
+    mem_limit: 4g
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 10
+    volumes:
+      - ./kafka/kafka_broker/kafka_store:/var/lib/kafka/data
+      - ./kafka/kafka_etc/kafak_secrets:/etc/kafka/secrets
+    depends_on:
+      - zookeeper
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    hostname: kafdrop
+    container_name: kafdrop
+    mem_limit: 256m
+    ports:
+      - "19000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:9092
+      JVM_OPTS: "-Xms16M -Xmx48M"
+      SERVER_SERVLET_CONTEXTPATH: "/"
+    depends_on:
+      - kafka
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:5.5.3
+    environment:
+      - SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL=zookeeper:2181
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:8081,http://localhost:8081
+    ports:
+      - 8085:8081
+    depends_on: [zookeeper, kafka]
+
+
+  debezium:
+    image: debezium/connect:1.4
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    depends_on: [kafka]
+    ports:
+      - 8083:8083
+
+  minio:
+    image: minio/minio:latest
+    hostname: minio
+    container_name: minio
+    mem_limit: 2g
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio_iceberg_data_lakehouse:/data
+
+  marketing_dw_postgres:
+    image: postgres:16
+    hostname: marketing_dw_postgres
+    container_name: marketing_dw_postgres
+    mem_limit: 2g
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: marketing_dw
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./postgres_data_warehouse:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d marketing_dw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  jobmanager:
+    build: 
+      context: .
+      dockerfile: flink/docker/Dockerfile
+    image: eczachly-pyflink
+    pull_policy: never
+    container_name: jobmanager
+    hostname: jobmanager
+    platform: linux/amd64
+    mem_limit: 3g
+    env_file:
+      - ./flink/docker/flink-env.env
+    expose:
+      - "6123"
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./flink/:/opt/src
+    command: jobmanager
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+
+  taskmanager:
+    image: eczachly-pyflink
+    pull_policy: never
+    container_name: taskmanager
+    platform: linux/amd64
+    mem_limit: 4g
+    env_file:
+      - ./flink/docker/flink-env.env
+    expose:
+      - "6121"
+      - "6122"
+    volumes:
+      - ./flink/:/opt/src
+    depends_on:
+      - jobmanager
+    command: taskmanager --taskmanager.registration.timeout 5 min
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 15
+        parallelism.default: 1
+
+  postgres-superset:
+    image: postgres:16
+    hostname: postgres-superset
+    container_name: postgres_superset
+    mem_limit: 1.5g
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_DB: superset_metadata
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+    volumes:
+      - ./superset/superset_metadata_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset_metadata"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: superset_redis
+    mem_limit: 512m
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./superset/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  superset:
+    build:
+      context: .
+      dockerfile: superset/docker/Dockerfile
+    container_name: superset_app
+    mem_limit: 1.5g
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres-superset:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      REDIS_HOST: superset_redis
+      REDIS_PORT: 6379
+      REDIS_CELERY_DB: 0
+      REDIS_RESULTS_DB: 1
+      REDIS_CACHE_DB: 2
+      FLASK_APP: superset
+      SUPERSET_LOAD_EXAMPLES: "no"
+      SUPERSET_WEBSERVER_TIMEOUT: 60
+    volumes:
+      - ./superset/configuration/superset_config.py:/app/pythonpath/superset_config.py
+    command: >
+      sh -c "
+        superset db upgrade &&
+        superset init &&
+        superset run -h 0.0.0.0 -p 8088 --with-threads
+      "
+    restart: always
+
+  superset_worker:
+    build:
+      context: .
+      dockerfile: superset/docker/Dockerfile
+    container_name: superset_worker
+    mem_limit: 1g
+    depends_on:
+      postgres-superset:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      REDIS_HOST: superset_redis
+      REDIS_PORT: 6379
+      REDIS_CELERY_DB: 0
+      REDIS_RESULTS_DB: 1
+      REDIS_CACHE_DB: 2
+      FLASK_APP: superset
+    volumes:
+      - ./superset/configuration/superset_config.py:/app/pythonpath/superset_config.py
+    command: celery --app=superset.tasks.celery_app:app worker --pool=prefork -O fair -c 4 --loglevel=info
+    restart: always
+
+  superset_beat:
+    build:
+      context: .
+      dockerfile: superset/docker/Dockerfile
+    container_name: superset_beat
+    mem_limit: 1g
+    depends_on:
+      postgres-superset:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      REDIS_HOST: superset_redis
+      REDIS_PORT: 6379
+      REDIS_CELERY_DB: 0
+      REDIS_RESULTS_DB: 1
+      REDIS_CACHE_DB: 2
+      FLASK_APP: superset
+    volumes:
+      - ./superset/configuration/superset_config.py:/app/pythonpath/superset_config.py
+    command: >
+      celery --app=superset.tasks.celery_app:app beat
+      --pidfile /tmp/celerybeat.pid
+      --schedule /tmp/celerybeat-schedule
+      --loglevel=info
+    restart: always
+
+  postgres_airflow:
+    image: postgres:16
+    container_name: postgres_airflow
+    mem_limit: 1.5g
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./airflow/postgres_data_airflow:/var/lib/postgresql/data
+
+  airflow-init:
+    build:
+      context: .
+      dockerfile: airflow/docker/Dockerfile
+    mem_limit: 1g
+    depends_on:
+      - postgres_airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: '3012001'
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+
+      # --- SMTP settings for email alerts ---
+      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+      AIRFLOW__SMTP__SMTP_PORT: 587
+      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
+      AIRFLOW__SMTP__SMTP_SSL: 'False'
+      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
+      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+    entrypoint: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email ziadashraf98765@gmail.com
+      "
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: airflow/docker/Dockerfile
+    container_name: airflow-webserver
+    mem_limit: 1.5g
+    restart: always
+    depends_on:
+      - postgres_airflow
+      - airflow-init
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: '3012001'
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__WEBSERVER__SESSION_BACKEND: securecookie
+      # --- SMTP settings for email alerts ---
+      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+      AIRFLOW__SMTP__SMTP_PORT: 587
+      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
+      AIRFLOW__SMTP__SMTP_SSL: 'False'
+      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
+      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+    command: webserver
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: airflow/docker/Dockerfile
+    container_name: airflow-scheduler
+    mem_limit: 1.5g
+    restart: always
+    depends_on:
+      - airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: '3012001'
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      # --- SMTP settings for email alerts ---
+      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+      AIRFLOW__SMTP__SMTP_PORT: 587
+      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
+      AIRFLOW__SMTP__SMTP_SSL: 'False'
+      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
+      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  dbt:
+    build:
+      context: .
+      dockerfile: dbt/docker/Dockerfile
+    container_name: dbt
+    mem_limit: 2g
+    volumes:
+      - ./dbt/dbt:/dbt
+      - ./dbt/dbt/profiles.yml:/root/.dbt/profiles.yml
+    working_dir: /dbt
+    entrypoint: /bin/bash
+    command: -c "tail -f /dev/null"
+    depends_on:
+      - clickhouse
+
+  pyspark:
+    build: 
+      context: .
+      dockerfile: spark/docker/Dockerfile
+    container_name: pyspark
+    hostname: pyspark
+    mem_limit: 12g
+    environment:
+      - SPARK_MODE=client
+      - SPARK_LOCAL_DIRS=/tmp/spark
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_UI_PORT=4040
+      - SPARK_UI_BIND_ADDRESS=0.0.0.0
+      - SPARK_DRIVER_MEMORY=13g
+    ports:
+      - "4040:4040"
+    volumes:
+      - ./spark:/opt/spark
+      - ./src/raw_data:/opt/raw_data
+    command: tail -f /dev/null
+    depends_on:
+      - minio
+      - marketing_dw_postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3.8
+    container_name: clickhouse
+    hostname: clickhouse
+    ports:
+      - "8123:8123"
+      - "9005:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./src/raw_data:/var/lib/clickhouse/user_files/raw_data
+
+    depends_on:
+      - zookeeper
+      - kafka
+
+volumes:
+  kafka_store:
+  kafak_secrets:
+  minio_iceberg_data_lakehouse:
+  postgres_data_warehouse:
+  flink:
+  redis_data: 
+  superset_metadata_db_data:
+  postgres_data_airflow:
+  dbt:
+  spark:
+  clickhouse_data:
+  
+

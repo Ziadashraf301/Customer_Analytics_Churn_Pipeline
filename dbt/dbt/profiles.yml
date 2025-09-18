@@ -1,0 +1,11 @@
+marketing_project:
+  outputs:
+    dev:
+      host: clickhouse
+      pass: ''
+      port: 8123
+      schema: 'marts'
+      threads: 12
+      type: clickhouse
+      user: default
+  target: dev
