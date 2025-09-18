@@ -8,5 +8,4 @@ postgres_data_warehouse/
 __pycache__/
 airflow_logs/
 redis_data/
-superset_metadata_db_data/
 postgres_data_airflow/
