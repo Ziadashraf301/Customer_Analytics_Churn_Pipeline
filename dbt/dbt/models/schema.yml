@@ -1,0 +1,14 @@
+# models/schema.yml (or a new file like models/sources.yml)
+
+version: 2
+
+sources:
+  - name: raw_stream            # Raw data from streaming ingestion via Flink
+    schema: raw_stream          # The schema where Flink jobs puts streaming data
+    tables:
+      - name: website_events_stream_flink # The table name Flink writes to
+      - name: purchase_events_stream_flink # The table name Flink writes purchase events to
+
+  - name: default              # database/schema in ClickHouse
+    tables:
+      - name: stg_customers    # the actual table name

@@ -1,0 +1,12 @@
+logs/
+kafka_etc/
+kafka/
+minio_iceberg_data_lakehouse/
+raw_data/
+postgres_data_warehouse/
+*.pyc
+__pycache__/
+airflow_logs/
+redis_data/
+superset_metadata_db_data/
+postgres_data_airflow/
