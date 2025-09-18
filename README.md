@@ -1,5 +1,7 @@
 # 📊 Marketing Customer Churn Pipeline Dags: Real-Time & Batch Data Pipeline
 
+![alt text](image.png)
+
 ## 🚀 Overview
 
 This project demonstrates a **hybrid data pipeline** that combines **real-time streaming** and **batch transformations** for customer analytics.
