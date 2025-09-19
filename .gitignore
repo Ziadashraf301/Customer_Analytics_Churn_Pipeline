@@ -1,11 +1,11 @@
 logs/
-kafka_etc/
 kafka/
-minio_iceberg_data_lakehouse/
+iceberg/
+raw_ml_table/
+.minio.sys/
 raw_data/
 postgres_data_warehouse/
 *.pyc
 __pycache__/
 airflow_logs/
-redis_data/
 postgres_data_airflow/
