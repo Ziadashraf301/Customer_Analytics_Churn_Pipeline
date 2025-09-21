@@ -1,11 +1,7 @@
--- Active: 1756648855428@@127.0.0.1@8123@default
--- Active: 1756648855428@@127.0.0.1@8123@default
 CREATE DATABASE IF NOT EXISTS raw_stream;
-CREATE DATABASE IF NOT EXISTS marts;
-
 USE raw_stream;
 
--- web events table
+-- web purchase table
 -- 1) Raw Kafka ingestion table
 CREATE TABLE raw_stream.kafka__purchase_events
 (
@@ -31,14 +27,14 @@ CREATE TABLE raw_stream.purchase_events_stream_flink
 (
     order_id String,
     user_id String,
-    purchase_time DateTime64(3),   -- ✅ match Postgres TIMESTAMP(3)
+    purchase_time DateTime64(3),
     total_amount Decimal(10, 2),
     product_ids String,
     payment_method String,
     shipping_address String,
     order_status String,
     currency String,
-    _processed_at DateTime64(3),   -- ✅ match Postgres TIMESTAMP(3)
+    _processed_at DateTime64(3),
     kafka_time DateTime,
     kafka_offset UInt64
 ) ENGINE = MergeTree
@@ -54,14 +50,14 @@ AS
 SELECT
     order_id,
     user_id,
-    toDateTime64(purchase_time / 1000, 3) AS purchase_time,  -- ✅ micros → ms
+    toDateTime64(purchase_time / 1000, 3) AS purchase_time,
     total_amount,
     product_ids,
     payment_method,
     shipping_address,
     order_status,
     currency,
-    toDateTime64(_processed_at / 1000, 3) AS _processed_at, -- ✅ micros → ms
+    toDateTime64(_processed_at / 1000, 3) AS _processed_at,
     _timestamp AS kafka_time,
     _offset AS kafka_offset
 FROM raw_stream.kafka__purchase_events;

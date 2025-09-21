@@ -1,6 +1,25 @@
-# 📊 Marketing Customer Churn Pipeline: Real-Time & Batch Data Pipeline
+# 📊 Customer Analytics And Churn Pipeline: Real-Time & Batch Data Pipeline
 
 ![intro\_image](images/intro_image.jpg)
+
+## 💼 Business Problem
+
+Customer churn is one of the biggest challenges in marketing and growth. Companies often spend **5–7x more** to acquire a new customer than to retain an existing one. Without timely insights, businesses struggle to:
+
+* Detect early signs of customer churn
+* Segment customers for personalized marketing
+* Track real-time customer behavior (website visits, purchases)
+
+---
+
+## 🏆 How This Project Helps the Business
+
+This pipeline directly addresses these problems by:
+
+* ⚡ **Real-time monitoring** of customer interactions (web events, purchases) to quickly spot drops in engagement
+* 🎯 Customer segmentation via clustering, enabling churn risk identification, targeted campaigns, upselling, and personalized offers
+* 📊 **Dashboards for decision-makers** with both real-time KPIs (page views, product clicks, orders) and historical trends (monthly acquisitions, country performance)
+* 💰 **Optimized retention strategies** that reduce churn, increase lifetime value, and improve ROI of marketing campaigns
 
 ---
 
@@ -41,7 +60,7 @@ This project demonstrates a **hybrid data pipeline** that combines **real-time s
 * 🤖 **ML insights** → Spark K-Means clusters customers into actionable groups with **95%+ pipeline reliability**
 * 🔄 **Automation** → Airflow DAGs ensure ingestion, transformation, and ML retraining run seamlessly
 * ⏰ **Fresh data** → Pipelines orchestrated every **6 hours**
-* 📧 **Monitoring** → Automatic alerts + summary reports for stakeholders
+* 📧 **Monitoring** → Automatic alerts + summary reports for stakeholders via Emails
 
 ---
 
@@ -113,8 +132,8 @@ This project demonstrates a **hybrid data pipeline** that combines **real-time s
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/Ziadashraf301/Marketing_Customer_Churn.git
-cd Marketing_Customer_Churn
+git clone https://github.com/Ziadashraf301/Customer_Analytics_Churn_Pipeline.git
+cd Customer_Analytics_Churn_Pipeline
 ```
 
 ### 2. Start services
@@ -123,23 +142,42 @@ cd Marketing_Customer_Churn
 docker-compose up -d
 ```
 
-This launches **Postgres, Kafka, Flink, Debezium, ClickHouse, Airflow, Superset, MinIO**.
+### 3. Create schemas and tables
 
-### 3. Generate batch data
+Connect to the databases running inside the containers and manually execute the DDL statements. The SQL commands are provided in the `sql_queries/` directory — copy them into your database clients.
+
+* **Postgres**
+
+  ```bash
+  docker exec -it marketing_dw_postgres psql -U user -d marketing_dw
+  ```
+
+  Then copy the SQL statements from **`sql_queries/postgres_ddl.sql`** and paste them into the psql session.
+
+* **ClickHouse**
+
+  ```bash
+   docker exec -it clickhouse clickhouse-client --user default
+  ```
+
+  Then copy the SQL statements from **`sql_queries/clickhouse_.sql`** files and paste them into the ClickHouse client.
+
+
+### 4. Generate batch data
 
 ```bash
 python src/data_generation_scripts/generate_master_customer_ids.py
 python src/data_generation_scripts/generate_batch_customers_profile_data.py
 ```
 
-### 4. Generate streaming events
+### 5. Generate streaming events
 
 ```bash
 make generate_streaming_purchases
 make generate_web_events
 ```
 
-### 5. Run Debezium connectors
+### 6. Run Debezium connectors
 
 Register **website events** + **purchase events** CDC connectors:
 
@@ -155,13 +193,14 @@ curl -X POST http://localhost:8083/connectors \
 -d @src/debezium/purchase_events_connector.json
 ```
 
-### 6. Trigger Airflow DAGs
+### 7. Trigger Airflow DAGs
 
 Access the Airflow UI at: http://localhost:8080
 
-### 7. Explore dashboards
+### 8. Explore dashboards
 
-* Superset → [http://localhost:8088](http://localhost:8088)
+Access the Superset at http://localhost:8088
+
 ---
 
 ## 🔌 Ports

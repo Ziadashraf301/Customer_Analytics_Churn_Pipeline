@@ -1,18 +1,20 @@
 services:
+  # -------------------- ZOOKEEPER --------------------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
     hostname: zookeeper
     mem_limit: 512m
     ports:
-      - "2181:2181"
+      - "${ZOOKEEPER_CLIENT_PORT}:${ZOOKEEPER_CLIENT_PORT}"
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes: 
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+    volumes:
       - ./kafka/zookeeper_data/data:/var/lib/zookeeper/data
       - ./kafka/zookeeper_data/log:/var/lib/zookeeper/log
 
+  # -------------------- KAFKA --------------------
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -22,84 +24,93 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_NUM_PARTITIONS: 10
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS}
     volumes:
       - ./kafka/kafka_broker/kafka_store:/var/lib/kafka/data
       - ./kafka/kafka_etc/kafak_secrets:/etc/kafka/secrets
     depends_on:
       - zookeeper
 
+  # -------------------- KAFDROP --------------------
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
-    hostname: kafdrop
     container_name: kafdrop
+    hostname: kafdrop
     mem_limit: 256m
     ports:
       - "19000:9000"
     environment:
-      KAFKA_BROKERCONNECT: kafka:9092
-      JVM_OPTS: "-Xms16M -Xmx48M"
-      SERVER_SERVLET_CONTEXTPATH: "/"
+      KAFKA_BROKERCONNECT: ${KAFKA_BROKERCONNECT}
+      JVM_OPTS: ${JVM_OPTS}
+      SERVER_SERVLET_CONTEXTPATH: ${SERVER_SERVLET_CONTEXTPATH}
     depends_on:
       - kafka
 
+  # -------------------- SCHEMA REGISTRY --------------------
   schema-registry:
     image: confluentinc/cp-schema-registry:5.5.3
+    container_name: schema-registry
     environment:
-      - SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL=zookeeper:2181
-      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
-      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:8081,http://localhost:8081
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: ${SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL}
+      SCHEMA_REGISTRY_HOST_NAME: ${SCHEMA_REGISTRY_HOST_NAME}
+      SCHEMA_REGISTRY_LISTENERS: ${SCHEMA_REGISTRY_LISTENERS}
     ports:
-      - 8085:8081
-    depends_on: [zookeeper, kafka]
+      - "8085:8081"
+    depends_on:
+      - zookeeper
+      - kafka
 
-
+  # -------------------- DEBEZIUM --------------------
   debezium:
     image: debezium/connect:1.4
+    container_name: debezium
     environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: connect_configs
-      OFFSET_STORAGE_TOPIC: connect_offsets
-      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
-      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-    depends_on: [kafka]
+      BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVERS}
+      GROUP_ID: ${GROUP_ID}
+      CONFIG_STORAGE_TOPIC: ${CONFIG_STORAGE_TOPIC}
+      OFFSET_STORAGE_TOPIC: ${OFFSET_STORAGE_TOPIC}
+      KEY_CONVERTER: ${KEY_CONVERTER}
+      VALUE_CONVERTER: ${VALUE_CONVERTER}
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL}
     ports:
-      - 8083:8083
+      - "8083:8083"
+    depends_on:
+      - kafka
 
+  # -------------------- MINIO --------------------
   minio:
     image: minio/minio:latest
-    hostname: minio
     container_name: minio
+    hostname: minio
     mem_limit: 2g
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     volumes:
       - ./minio_iceberg_data_lakehouse:/data
 
+  # -------------------- MARKETING DW POSTGRES --------------------
   marketing_dw_postgres:
     image: postgres:16
-    hostname: marketing_dw_postgres
     container_name: marketing_dw_postgres
+    hostname: marketing_dw_postgres
     mem_limit: 2g
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: marketing_dw
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./postgres_data_warehouse:/var/lib/postgresql/data
     command:
@@ -111,11 +122,12 @@ services:
       - "-c"
       - "max_replication_slots=10"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d marketing_dw"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # -------------------- FLINK --------------------
   jobmanager:
     build: 
       context: .
@@ -167,25 +179,28 @@ services:
         taskmanager.numberOfTaskSlots: 15
         parallelism.default: 1
 
+
+  # -------------------- POSTGRES SUPERSET --------------------
   postgres-superset:
     image: postgres:16
-    hostname: postgres-superset
     container_name: postgres_superset
+    hostname: postgres-superset
     mem_limit: 1.5g
     ports:
       - "5435:5432"
     environment:
-      POSTGRES_DB: superset_metadata
-      POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset
+      POSTGRES_DB: ${SUPERSET_DB}
+      POSTGRES_USER: ${SUPERSET_USER}
+      POSTGRES_PASSWORD: ${SUPERSET_PASSWORD}
     volumes:
       - ./superset/superset_metadata_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U superset -d superset_metadata"]
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_USER} -d ${SUPERSET_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # -------------------- REDIS --------------------
   redis:
     image: redis:7-alpine
     container_name: superset_redis
@@ -201,6 +216,7 @@ services:
       timeout: 3s
       retries: 5
 
+  # -------------------- SUPERSET --------------------
   superset:
     build:
       context: .
@@ -286,19 +302,21 @@ services:
       --loglevel=info
     restart: always
 
+  # -------------------- POSTGRES AIRFLOW --------------------
   postgres_airflow:
     image: postgres:16
     container_name: postgres_airflow
     mem_limit: 1.5g
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
     ports:
       - "5436:5432"
+    environment:
+      POSTGRES_USER: ${AIRFLOW_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB}
     volumes:
       - ./airflow/postgres_data_airflow:/var/lib/postgresql/data
 
+  # -------------------- AIRFLOW INIT --------------------
   airflow-init:
     build:
       context: .
@@ -307,30 +325,29 @@ services:
     depends_on:
       - postgres_airflow
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: '3012001'
-      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
-
-      # --- SMTP settings for email alerts ---
-      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
-      AIRFLOW__SMTP__SMTP_PORT: 587
-      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
-      AIRFLOW__SMTP__SMTP_SSL: 'False'
-      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
-      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
-      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_USER}:${AIRFLOW_PASSWORD}@postgres_airflow:5432/${AIRFLOW_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${AIRFLOW_TIMEZONE}
+      AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_LOAD_EXAMPLES}
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
+      AIRFLOW__SMTP__SMTP_STARTTLS: ${SMTP_STARTTLS}
+      AIRFLOW__SMTP__SMTP_SSL: ${SMTP_SSL}
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
     entrypoint: >
       bash -c "
         airflow db migrate &&
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email ziadashraf98765@gmail.com
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email ${SMTP_MAIL_FROM}
       "
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/airflow_logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # -------------------- AIRFLOW WEBSERVER --------------------
   airflow-webserver:
     build:
       context: .
@@ -344,26 +361,26 @@ services:
     ports:
       - "8080:8080"
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: '3012001'
-      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_USER}:${AIRFLOW_PASSWORD}@postgres_airflow:5432/${AIRFLOW_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${AIRFLOW_TIMEZONE}
+      AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_LOAD_EXAMPLES}
       AIRFLOW__WEBSERVER__SESSION_BACKEND: securecookie
-      # --- SMTP settings for email alerts ---
-      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
-      AIRFLOW__SMTP__SMTP_PORT: 587
-      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
-      AIRFLOW__SMTP__SMTP_SSL: 'False'
-      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
-      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
-      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
+      AIRFLOW__SMTP__SMTP_STARTTLS: ${SMTP_STARTTLS}
+      AIRFLOW__SMTP__SMTP_SSL: ${SMTP_SSL}
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
     command: webserver
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/airflow_logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # -------------------- AIRFLOW SCHEDULER --------------------
   airflow-scheduler:
     build:
       context: .
@@ -374,25 +391,25 @@ services:
     depends_on:
       - airflow-webserver
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: '3012001'
-      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
-      # --- SMTP settings for email alerts ---
-      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
-      AIRFLOW__SMTP__SMTP_PORT: 587
-      AIRFLOW__SMTP__SMTP_STARTTLS: 'True'
-      AIRFLOW__SMTP__SMTP_SSL: 'False'
-      AIRFLOW__SMTP__SMTP_USER: ziadashraf98765@gmail.com
-      AIRFLOW__SMTP__SMTP_PASSWORD: "bqdv sxlf txat hfqs"   # Gmail App Password
-      AIRFLOW__SMTP__SMTP_MAIL_FROM: ziadashraf98765@gmail.com
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_USER}:${AIRFLOW_PASSWORD}@postgres_airflow:5432/${AIRFLOW_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${AIRFLOW_TIMEZONE}
+      AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_LOAD_EXAMPLES}
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
+      AIRFLOW__SMTP__SMTP_STARTTLS: ${SMTP_STARTTLS}
+      AIRFLOW__SMTP__SMTP_SSL: ${SMTP_SSL}
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
     command: scheduler
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/airflow_logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # -------------------- DBT --------------------
   dbt:
     build:
       context: .
@@ -408,6 +425,7 @@ services:
     depends_on:
       - clickhouse
 
+  # -------------------- PYSPARK --------------------
   pyspark:
     build: 
       context: .
@@ -437,7 +455,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-
+  # -------------------- CLICKHOUSE --------------------
   clickhouse:
     image: clickhouse/clickhouse-server:24.3.8
     container_name: clickhouse
@@ -445,25 +463,26 @@ services:
     ports:
       - "8123:8123"
       - "9005:9000"
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./src/raw_data:/var/lib/clickhouse/user_files/raw_data
-
     depends_on:
       - zookeeper
       - kafka
 
+# -------------------- VOLUMES --------------------
 volumes:
   kafka_store:
   kafak_secrets:
   minio_iceberg_data_lakehouse:
   postgres_data_warehouse:
   flink:
-  redis_data: 
+  redis_data:
   superset_metadata_db_data:
   postgres_data_airflow:
   dbt:
   spark:
   clickhouse_data:
-  
-
