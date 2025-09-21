@@ -14,7 +14,7 @@ RUN apt-get update && \
 USER airflow
 
 # mount the dags directory
-COPY dags/requirements.txt /tmp/
+COPY airflow/docker/requirements.txt /tmp/
 
 # install the requirements
 RUN pip install --no-cache-dir -r /tmp/requirements.txt

@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS marts;
+USE marts;
+
 CREATE TABLE marts.customers_clusters_analysis
 (
     cluster Int32,

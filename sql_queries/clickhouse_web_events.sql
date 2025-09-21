@@ -1,7 +1,4 @@
--- Active: 1756648855428@@127.0.0.1@8123@default
--- Active: 1756648855428@@127.0.0.1@8123@default
 CREATE DATABASE IF NOT EXISTS raw_stream;
-
 USE raw_stream;
 
 -- web events table
