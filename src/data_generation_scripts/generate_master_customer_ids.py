@@ -10,7 +10,7 @@ log.info("Starting master customer ID generation script.")
 
 # Configuration
 NUM_MASTER_CUSTOMERS = 100_000_000  # 100M IDs
-OUTPUT_FILE = os.path.join('.', 'src' , 'raw_data', 'customer_ids2.ndjson')
+OUTPUT_FILE = os.path.join('.', 'src' , 'raw_data', 'customer_ids.ndjson')
 
 def generate_and_save_master_ids(num_ids, output_file, chunk_size=1_000_000):
     """

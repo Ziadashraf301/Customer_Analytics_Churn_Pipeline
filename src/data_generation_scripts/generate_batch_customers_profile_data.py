@@ -5,17 +5,14 @@ from typing import Iterable
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+from itertools import islice
 
-# --------------------
 # Logging
-# --------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 log.info("🚀 Starting ultra-fast batch customer data generation.")
 
-# --------------------
 # Config
-# --------------------
 # Updated paths
 MASTER_CUSTOMER_IDS_FILE = os.path.join('.', 'src' ,'raw_data', 'customer_ids.ndjson')
 OUTPUT_PATH = os.path.join('.', 'src' , 'raw_data', 'customer_profiles.parquet')
@@ -34,27 +31,28 @@ COUNTRY_CODES = np.array([
 
 rng = np.random.default_rng(RNG_SEED)
 
-# --------------------
 # Stream IDs
-# --------------------
 def stream_customer_ids(file_name: str) -> Iterable[str]:
     """Stream customer IDs from NDJSON file using ujson (fast)."""
     if not os.path.exists(file_name):
         raise FileNotFoundError(f"❌ Missing file: {file_name}")
-
+    
+    failed = 0
     with open(file_name, "r") as f:
         for i, line in enumerate(f, start=1):
             try:
                 record = json.loads(line)
                 yield record["customer_id"]
             except Exception:
+                failed+=1
                 continue
             if i % 1_000_000 == 0:
                 log.info(f"🔄 Processed {i:,} IDs...")
+    
+    if failed > 0:
+        log.warning(f"⚠️  Failed to parse {failed} lines from {file_name}")
 
-# --------------------
 # Column generators
-# --------------------
 def generate_dates(size: int, days_back: int = 730) -> np.ndarray:
     offsets = rng.integers(0, days_back + 1, size=size, dtype=np.int32)
     base = np.datetime64("today") - np.timedelta64(days_back, "D")
@@ -63,9 +61,7 @@ def generate_dates(size: int, days_back: int = 730) -> np.ndarray:
 def to_emails_from_ids(user_ids: np.ndarray) -> np.ndarray:
     return np.char.add(user_ids.astype(str), "@example.com")
 
-# --------------------
 # Main generator
-# --------------------
 def generate_customer_profiles_streaming(
     input_file: str,
     output_file: str,
@@ -86,7 +82,7 @@ def generate_customer_profiles_streaming(
     id_iter = stream_customer_ids(input_file)
 
     while rows_written < num_profiles:
-        ids_chunk = [next(id_iter, None) for _ in range(chunk_size)]
+        ids_chunk = list(islice(id_iter, chunk_size))
         ids_chunk = [i for i in ids_chunk if i is not None]
         if not ids_chunk:
             break
@@ -122,9 +118,7 @@ def generate_customer_profiles_streaming(
 
     log.info(f"✅ Done. Wrote {rows_written:,} rows -> {output_file} (compression={compression})")
 
-# --------------------
 # Entry
-# --------------------
 if __name__ == "__main__":
     try:
         generate_customer_profiles_streaming(

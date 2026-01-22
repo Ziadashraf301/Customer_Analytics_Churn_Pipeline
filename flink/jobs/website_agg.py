@@ -6,7 +6,6 @@ from pyflink.table import EnvironmentSettings, TableEnvironment
 from typing import Optional
 import argparse
 
-
 class WebsiteEventsJob:
     def __init__(self, timeout_seconds: Optional[int] = None):
         # Logging
@@ -28,16 +27,12 @@ class WebsiteEventsJob:
         signal.signal(signal.SIGINT, self._handle_stop_signal)
         signal.signal(signal.SIGTERM, self._handle_stop_signal)
 
-    # --------------------
     # Signal handler
-    # --------------------
     def _handle_stop_signal(self, signum, frame):
         self.stop_requested = True
         self.log.info("Stop signal received. Terminating job...")
 
-    # --------------------
     # Env var reader
-    # --------------------
     @staticmethod
     def _env_var(name: str) -> str:
         value = os.getenv(name)
@@ -45,9 +40,7 @@ class WebsiteEventsJob:
             raise ValueError(f"Environment variable '{name}' is not set")
         return value
 
-    # --------------------
     # Kafka source
-    # --------------------
     def create_kafka_source(self):
         self.log.info("Creating Kafka source table for website events...")
         self.t_env.execute_sql(f"""
@@ -75,9 +68,7 @@ class WebsiteEventsJob:
         """)
         self.log.info("Kafka source table created.")
 
-    # --------------------
     # Postgres sink
-    # --------------------
     def create_postgres_sink(self):
         self.log.info("Creating PostgreSQL sink table for website aggregates...")
         self.t_env.execute_sql(f"""
@@ -102,9 +93,7 @@ class WebsiteEventsJob:
         """)
         self.log.info("PostgreSQL sink table for website aggregates created.")
 
-    # --------------------
     # Run job
-    # --------------------
     def run(self):
         self.create_kafka_source()
         self.create_postgres_sink()
@@ -141,9 +130,7 @@ class WebsiteEventsJob:
         self.log.info("Website events aggregation job stopped.")
 
 
-# --------------------
 # Main Entrypoint
-# --------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--timeout", type=int, default=0, help="Job timeout in seconds (0 = no timeout)")

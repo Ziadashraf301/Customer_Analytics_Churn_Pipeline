@@ -1,15 +1,14 @@
 import json
 import time
 import random
+from typing import Iterable
 from datetime import datetime
 from faker import Faker
 from kafka import KafkaProducer
 import logging
 import os
 
-# --------------------
 # Logging setup
-# --------------------
 LOGS_DIR = os.path.join('.', 'src' ,'logs')
 os.makedirs(LOGS_DIR, exist_ok=True)
 log_file = os.path.join(LOGS_DIR, 'web_event_stream.log')
@@ -26,9 +25,7 @@ log = logging.getLogger(__name__)
 
 fake = Faker()
 
-# --------------------
 # Configuration
-# --------------------
 NUM_EVENTS_TO_GENERATE = None  # None for continuous
 EVENT_GENERATION_DELAY = 0.0001
 CHUNK_SIZE = 1_000_000  # number of IDs per chunk
@@ -48,7 +45,7 @@ DEVICE_TYPES = ['mobile', 'desktop', 'tablet']
 # Kafka config
 KAFKA_BOOTSTRAP_SERVERS = 'localhost:9093'
 KAFKA_TOPIC = 'website_events'
-MASTER_CUSTOMER_IDS_FILE = os.path.join('.', 'src' ,'raw_data', 'customer_ids.ndjson')  # updated path
+MASTER_CUSTOMER_IDS_FILE = os.path.join('.', 'src' ,'raw_data', 'customer_ids.ndjson')
 
 # Pre-generate product IDs
 NUM_FAKE_PRODUCTS = 200
@@ -56,20 +53,20 @@ fake_product_ids = [fake.uuid4() for _ in range(NUM_FAKE_PRODUCTS)]
 
 producer = None
 
-# --------------------
 # Stream IDs in chunks
-# --------------------
-def stream_customer_id_chunks(file_name: str, chunk_size: int):
+def stream_customer_id_chunks(file_name: str, chunk_size: int) -> Iterable[str]:
     if not os.path.exists(file_name):
         raise FileNotFoundError(f"File not found: {file_name}")
 
     chunk = []
+    failed = 0
     with open(file_name, "r") as f:
         for i, line in enumerate(f, start=1):
             try:
                 record = json.loads(line)
                 chunk.append(record["customer_id"])
             except Exception:
+                failed+=1
                 continue
 
             if len(chunk) >= chunk_size:
@@ -82,9 +79,10 @@ def stream_customer_id_chunks(file_name: str, chunk_size: int):
         if chunk:
             yield chunk
 
-# --------------------
+        if failed > 0:
+            log.warning(f"⚠️  Failed to parse {failed} lines from {file_name}")
+
 # Event generation
-# --------------------
 def generate_event(user_id):
     event_timestamp = datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
     session_id = fake.uuid4()
@@ -120,9 +118,7 @@ def generate_event(user_id):
         'search_query': search_query
     }
 
-# --------------------
 # Main generator
-# --------------------
 def start_event_generation():
     global producer
     event_count = 0

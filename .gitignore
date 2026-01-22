@@ -9,3 +9,36 @@ postgres_data_warehouse/
 __pycache__/
 airflow_logs/
 postgres_data_airflow/
+.xl.meta
+**/*.xl.meta
+flink-env.env
+.DS_Store
+.vscode/
+*.env
+
+## Ignore mounted database folders, logs, and runtime data
+# Data lake / object storage
+minio_iceberg_data_lakehouse/
+
+# Postgres data mounts
+postgres_data_*/
+
+# dbt build artifacts and logs
+dbt/target/
+dbt/logs/
+
+# Airflow runtime mounts
+airflow/postgres_data_airflow/
+airflow/airflow_logs/
+
+
+# Flink runtime
+flink/jobs/__pycache__/
+
+# Superset runtime data
+superset/redis_data/
+superset/superset_metadata_db_data/
+
+# General and nested logs
+*/logs/
+src/logs/
