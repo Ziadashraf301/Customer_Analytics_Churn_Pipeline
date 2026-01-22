@@ -136,70 +136,146 @@ git clone https://github.com/Ziadashraf301/Customer_Analytics_Churn_Pipeline.git
 cd Customer_Analytics_Churn_Pipeline
 ```
 
-### 2. Start services
+---
+
+### 2. Generate batch data
 
 ```bash
-docker-compose up -d
+make generate_master_customer_ids
+make generate_batch_customers_profile_data
 ```
 
-### 3. Create schemas and tables
+* Generates **customer IDs** and **batch customer profiles** for analytics.
 
-Connect to the databases running inside the containers and manually execute the DDL statements. The SQL commands are provided in the `sql_queries/` directory — copy them into your database clients.
+---
 
-* **Postgres**
+## 🔹 Streaming Pipeline
 
-  ```bash
-  docker exec -it marketing_dw_postgres psql -U user -d marketing_dw
-  ```
-
-  Then copy the SQL statements from **`sql_queries/postgres_ddl.sql`** and paste them into the psql session.
-
-* **ClickHouse**
-
-  ```bash
-   docker exec -it clickhouse clickhouse-client --user default
-  ```
-
-  Then copy the SQL statements from **`sql_queries/clickhouse_.sql`** files and paste them into the ClickHouse client.
-
-
-### 4. Generate batch data
+### 3. Start streaming services
 
 ```bash
-python src/data_generation_scripts/generate_master_customer_ids.py
-python src/data_generation_scripts/generate_batch_customers_profile_data.py
+make streaming_stack
 ```
 
-### 5. Generate streaming events
+Includes:
+
+* Zookeeper, Kafka, Kafdrop
+* ClickHouse for streaming ingestion
+* Flink (JobManager + TaskManager)
+* Airflow scheduler & webserver
+
+> ⏱ Wait 1–2 minutes for services to be ready.
+
+---
+
+### 4. Generate streaming events
 
 ```bash
 make generate_streaming_purchases
 make generate_web_events
 ```
 
-### 6. Run Debezium connectors
+* These simulate **real-time purchase and web activity**.
+* Micro-batched generation ensures memory-safe, high-throughput ingestion.
 
-Register **website events** + **purchase events** CDC connectors:
+---
+
+### 5. Register Debezium connectors (CDC)
 
 ```bash
 # Website events connector
 curl -X POST http://localhost:8083/connectors \
 -H "Content-Type: application/json" \
--d @src/debezium/web_event_connector.json
+-d @debezium/web_event_connector.json
 
 # Purchase events connector
 curl -X POST http://localhost:8083/connectors \
 -H "Content-Type: application/json" \
--d @src/debezium/purchase_events_connector.json
+-d @debezium/purchase_events_connector.json
 ```
 
-### 7. Trigger Airflow DAGs
+---
 
-Access the Airflow UI at: http://localhost:8080
+### 6. Run streaming DAGs in Airflow
 
-### 8. Explore dashboards
+* Open [http://localhost:8080](http://localhost:8080)
+* Trigger streaming pipelines: **web events + purchase events processing**
 
-Access the Superset at http://localhost:8088
+---
+
+### 7. Explore near real-time dashboards
+
+```bash
+make dashboard_stack
+```
+
+* Access **Superset** at [http://localhost:8088](http://localhost:8088)
+* Visualize live metrics and streaming-based analytics.
+
+---
+
+## 🔹 Batch Pipeline
+
+### 8. Start batch / orchestration stack
+
+```bash
+make batch_stack
+```
+
+Services:
+
+* **ClickHouse** for batch analytics
+* **Airflow** (scheduler + webserver) for orchestrating DAGs
+* **PySpark** for large-scale batch computations
+* **DBT** for transformations
+
+---
+
+### 9. Trigger batch DAGs in Airflow
+
+* Open [http://localhost:8080](http://localhost:8080)
+* Run **batch DAGs** to process historical customer data and generate reports.
+
+Batch jobs include:
+
+* Aggregating historical purchase and web events
+* Enriching customer profiles
+* Computing churn metrics
+* Storing aggregated results in ClickHouse
+
+---
+
+### 10. Explore batch analytics dashboards
+
+```bash
+make dashboard_stack
+```
+
+* Access Superset at [http://localhost:8088](http://localhost:8088)
+* Explore **historical trends, churn metrics, and customer segmentation dashboards**.
+
+---
+
+### 11. Stop batch services
+
+```bash
+make batch_stack_down
+make down_dashboard_stack
+```
+
+Or stop **all Docker services**:
+
+```bash
+docker compose down
+```
+
+---
+
+## 🔹 Optional: Start all services at once
+
+```bash
+docker-compose up -d
+```
 
 ---
 

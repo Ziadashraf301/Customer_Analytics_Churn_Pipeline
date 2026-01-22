@@ -20,11 +20,11 @@ with DAG(
     schedule_interval="0 */3 * * *",
     start_date=datetime(2025, 8, 26),
     catchup=True,
-    tags=['streaming' ,'customer', 'events', 'pipeline', 'spark', 'dbt', 'iceberg']
+    tags=['streaming' ,'customer', 'events', 'pipeline', 'flink', 'postgres', 'superset']
 ) as dag:
 
 
-    # Run Flink jobs with 60-second timeout (always success)
+    # Run Flink jobs with 60-second timeout
     run_website_events = BashOperator(
         task_id="run_website_events",
         bash_command=(
@@ -40,7 +40,5 @@ with DAG(
         ),
         do_xcom_push=False
     )
-
-
 
 [run_website_events, run_purchase]

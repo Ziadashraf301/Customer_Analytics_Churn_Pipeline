@@ -6,14 +6,14 @@ USE raw_stream;
 CREATE TABLE raw_stream.kafka__website_events
 (
     user_id String,
-    event_timestamp UInt64,    -- epoch micros from source
+    event_timestamp UInt64,    
     event_type String,
     page_url String,
     product_id String,
     session_id String,
     device_type String,
     search_query String,
-    _processed_at UInt64 -- epoch micros from Flink
+    _processed_at UInt64
 ) ENGINE = Kafka
 SETTINGS kafka_broker_list = 'kafka:9092',
          kafka_topic_list = 'marketing_dw.raw_stream.website_events_stream_flink',

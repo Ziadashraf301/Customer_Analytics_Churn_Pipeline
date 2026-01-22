@@ -9,15 +9,11 @@ import logging
 import subprocess
 from airflow.utils.trigger_rule import TriggerRule
 
-# -------------------------------------------------------------------------
 # Logging setup
-# -------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("CustomerEventsDAG")
 
-# -------------------------------------------------------------------------
 # DAG definition
-# -------------------------------------------------------------------------
 default_args = {
     'owner': 'airflow',
     'depends_on_past': True,

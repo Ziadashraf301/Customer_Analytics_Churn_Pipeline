@@ -7,18 +7,18 @@ CREATE TABLE raw_stream.kafka__purchase_events
 (
     order_id String,
     user_id String,
-    purchase_time UInt64,    -- epoch micros from source
-    total_amount Decimal(10, 2),
+    purchase_time UInt64,
+    total_amount Decimal(20, 2),
     product_ids String,
     payment_method String,
     shipping_address String,
     order_status String,
     currency String,
-    _processed_at UInt64 -- epoch micros from Flink
+    _processed_at UInt64
 ) ENGINE = Kafka
 SETTINGS kafka_broker_list = 'kafka:9092',
          kafka_topic_list = 'marketing_dw.raw_stream.purchase_events_stream_flink',
-         kafka_group_name = 'dev1',
+         kafka_group_name = 'dev',
          kafka_format = 'AvroConfluent',
          format_avro_schema_registry_url='http://schema-registry:8081';
 
@@ -28,7 +28,7 @@ CREATE TABLE raw_stream.purchase_events_stream_flink
     order_id String,
     user_id String,
     purchase_time DateTime64(3),
-    total_amount Decimal(10, 2),
+    total_amount Decimal(20, 2),
     product_ids String,
     payment_method String,
     shipping_address String,

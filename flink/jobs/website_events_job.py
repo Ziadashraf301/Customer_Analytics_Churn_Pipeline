@@ -23,16 +23,12 @@ class WebsiteEventsJob:
         env_settings = EnvironmentSettings.in_streaming_mode()
         self.t_env = TableEnvironment.create(env_settings)
 
-    # --------------------
     # Signal handler
-    # --------------------
     def _handle_stop_signal(self, signum, frame):
         self.stop_requested = True
         self.log.info("Stop signal received. Terminating job...")
 
-    # --------------------
     # Env var reader
-    # --------------------
     @staticmethod
     def env_var(name: str) -> str:
         value = os.getenv(name)
@@ -40,9 +36,7 @@ class WebsiteEventsJob:
             raise ValueError(f"Environment variable '{name}' is not set")
         return value
 
-    # --------------------
     # Define Kafka source
-    # --------------------
     def create_kafka_source(self):
         self.log.info("Creating Kafka source table for website events...")
         self.t_env.execute_sql(f"""
@@ -70,9 +64,7 @@ class WebsiteEventsJob:
         """)
         self.log.info("Kafka website events source table created.")
 
-    # --------------------
     # Define Postgres sink
-    # --------------------
     def create_postgres_sink(self):
         self.log.info("Creating PostgreSQL sink table for website events...")
         self.t_env.execute_sql(f"""
@@ -97,9 +89,7 @@ class WebsiteEventsJob:
         """)
         self.log.info("PostgreSQL sink table for website events created.")
 
-    # --------------------
     # Run job
-    # --------------------
     def run(self):
         self.create_kafka_source()
         self.create_postgres_sink()
@@ -137,9 +127,7 @@ class WebsiteEventsJob:
         self.log.info("Purchase events job stopped.")
 
 
-# --------------------
 # Main Entrypoint
-# --------------------
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
