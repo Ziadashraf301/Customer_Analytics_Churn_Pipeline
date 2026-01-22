@@ -42,3 +42,4 @@ superset/superset_metadata_db_data/
 # General and nested logs
 */logs/
 src/logs/
+*Data_Pipeline.drawio.html
