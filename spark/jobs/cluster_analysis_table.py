@@ -1,18 +1,14 @@
 import logging
 from pyspark.sql import SparkSession, functions as F
 
-# --------------------------
 # Setup logging
-# --------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger("ClusterAnalysis")
 
-# --------------------------
 # Spark session
-# --------------------------
 spark = (
     SparkSession.builder
     .appName("CustomerClusteringSim")
@@ -50,24 +46,18 @@ spark = (
     .getOrCreate()
 )
 
-# --------------------------
 # Load tables
-# --------------------------
 logger.info("Loading customer features table ...")
 df_customers = spark.table("minio_catalog.default.int_customer_profiles_ml")
 
 logger.info("Loading customer clusters table ...")
 df_clusters = spark.table("minio_catalog.default.customer_clusters")
 
-# --------------------------
 # Join tables
-# --------------------------
 logger.info("Joining features with clusters ...")
 df_joined = df_customers.join(df_clusters, on="customer_id", how="inner")
 
-# --------------------------
 # Define feature columns
-# --------------------------
 feat_cols = [
     "days_since_registration",
     "total_orders",
@@ -91,9 +81,7 @@ feat_cols = [
     "total_product_views",
 ]
 
-# --------------------------
 # Cluster-level aggregation
-# --------------------------
 logger.info("Aggregating cluster statistics ...")
 
 agg_exprs = [F.avg(c).alias(f"avg_{c}") for c in feat_cols]
@@ -108,9 +96,7 @@ df_cluster_analysis = (
 
 logger.info("Cluster analysis complete ✅")
 
-# --------------------------
 # Write results to ClickHouse
-# --------------------------
 logger.info("Writing DataFrame to ClickHouse table marts.customers_clusters_analysis ...")
 
 (

@@ -1,9 +1,7 @@
 from pyspark.sql import SparkSession, functions as F
 from datetime import datetime
 
-# -------------------------------
 # Spark session
-# -------------------------------
 spark = (
     SparkSession.builder
     .appName("CustomerClusteringMonitor")
@@ -29,22 +27,16 @@ spark = (
     .getOrCreate()
 )
 
-# -------------------------------
 # Read log table
-# -------------------------------
 log_table = "minio_catalog.default.customer_clusters_log"
 df_log = spark.read.format("iceberg").load(log_table)
 
-# -------------------------------
 # Extract latest metrics
-# -------------------------------
 latest_run = df_log.orderBy(F.col("run_date").desc())
 metrics_steps = ["scaler_params", "pca_params", "kmeans_metrics"]
 metrics_df = latest_run.filter(F.col("step").isin(metrics_steps))
 
 metrics_df.show(100,truncate=False)
 
-# -------------------------------
 # Stop Spark
-# -------------------------------
 spark.stop()

@@ -10,9 +10,7 @@ from pyspark.ml.clustering import KMeans, KMeansModel
 
 logging.basicConfig(level=logging.INFO)
 
-# ----------------------------------------------------------------------
 # Spark Session
-# ----------------------------------------------------------------------
 spark = (
     SparkSession.builder
     .appName("CustomerClusteringSim")
@@ -41,9 +39,7 @@ spark = (
 
 logging.info("✅ Spark session started.")
 
-# ----------------------------------------------------------------------
 # Parameters
-# ----------------------------------------------------------------------
 table_name = "minio_catalog.default.int_customer_profiles_ml"
 id_col = "customer_id"
 k = 3
@@ -77,9 +73,7 @@ feat_cols = [
     "total_product_views",
 ]
 
-# ----------------------------------------------------------------------
 # Logging helper
-# ----------------------------------------------------------------------
 def log_step(step, status, message):
     df_log = spark.createDataFrame(
         [(datetime.now(), step, status, message)],
@@ -90,9 +84,7 @@ def log_step(step, status, message):
     else:
         df_log.writeTo("minio_catalog.default.customer_clusters_log").create()
 
-# ----------------------------------------------------------------------
 # Model freshness checker
-# ----------------------------------------------------------------------
 def load_or_train_model(model_class, model_path, train_fn, max_age_days=7):
     """
     Load a model if fresh, otherwise retrain and overwrite.
@@ -126,9 +118,7 @@ def load_or_train_model(model_class, model_path, train_fn, max_age_days=7):
     log_step("model_train", "INFO", f"Trained and saved new {model_class.__name__} to {model_path}")
     return model
 
-# ----------------------------------------------------------------------
 # Load data
-# ----------------------------------------------------------------------
 try:
     log_step("load_data", "INFO", f"Loading table {table_name}")
     df = spark.read.format("iceberg").load(table_name)
@@ -149,17 +139,13 @@ df_num = df.select(id_col, *feat_cols).fillna(0)
 df.unpersist()
 del df
 
-# ----------------------------------------------------------------------
 # Assemble features
-# ----------------------------------------------------------------------
 log_step("assemble_features", "INFO", "Assembling features")
 assembler = VectorAssembler(inputCols=feat_cols, outputCol="features")
 df_vec = assembler.transform(df_num)
 del df_num
 
-# ----------------------------------------------------------------------
 # Standard Scaler
-# ----------------------------------------------------------------------
 scaler_model = load_or_train_model(
     StandardScalerModel,
     scaler_path,
@@ -168,9 +154,7 @@ scaler_model = load_or_train_model(
 df_scaled = scaler_model.transform(df_vec)
 df_vec.unpersist()
 
-# ----------------------------------------------------------------------
 # PCA
-# ----------------------------------------------------------------------
 pca_model = load_or_train_model(
     PCAModel,
     pca_path,
@@ -179,9 +163,7 @@ pca_model = load_or_train_model(
 df_pca = pca_model.transform(df_scaled)
 df_scaled.unpersist()
 
-# ----------------------------------------------------------------------
 # KMeans
-# ----------------------------------------------------------------------
 kmeans_model = load_or_train_model(
     KMeansModel,
     kmeans_path,
@@ -193,9 +175,7 @@ df_clusters = kmeans_model.transform(df_pca).select(
 ).withColumn("run_date", F.current_timestamp())
 df_pca.unpersist()
 
-# ----------------------------------------------------------------------
 # Save to Iceberg
-# ----------------------------------------------------------------------
 try:
     log_step("save_clusters", "INFO", "Writing clusters to Iceberg table `customer_clusters`")
     df_clusters.writeTo("minio_catalog.default.customer_clusters").createOrReplace()

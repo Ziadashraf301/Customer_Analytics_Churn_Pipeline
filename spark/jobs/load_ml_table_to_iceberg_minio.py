@@ -1,9 +1,7 @@
 from pyspark.sql import SparkSession
 
 
-# ----------------------------------------------------------------------
 # Spark Session
-# ----------------------------------------------------------------------
 spark = (
     SparkSession.builder
     .appName("CustomerClusteringSim")
@@ -30,9 +28,7 @@ spark = (
     .getOrCreate()
 )
 
-# --------------------------------------------------------------------------
 # Read data directly from MinIO S3 Parquet (saved ClickHouse export)
-# --------------------------------------------------------------------------
 customers_ml = (
     spark.read
     .format("parquet")
@@ -42,9 +38,7 @@ customers_ml = (
 customers_ml.show(truncate=False)
 print("Data loaded from MinIO (ClickHouse S3 export).")
 
-# --------------------------------------------------------------------------
 # Write to Iceberg (Hadoop catalog)
-# --------------------------------------------------------------------------
 (
     customers_ml
     .writeTo("minio_catalog.default.int_customer_profiles_ml")
@@ -53,9 +47,7 @@ print("Data loaded from MinIO (ClickHouse S3 export).")
 
 print("Data successfully written to Iceberg (Hadoop catalog): minio_catalog.default.int_customer_profiles_ml")
 
-# --------------------------------------------------------------------------
 # Verify read
-# --------------------------------------------------------------------------
 df_iceberg_read = spark.read.format("iceberg").load("minio_catalog.default.int_customer_profiles_ml")
 print(f"Rows in Iceberg table: {df_iceberg_read.count()}")
 df_iceberg_read.show(5, truncate=False)

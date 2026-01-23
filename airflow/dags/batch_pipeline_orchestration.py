@@ -1,13 +1,8 @@
 from airflow import DAG
-from airflow.utils.dates import days_ago
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
-from airflow.exceptions import AirflowSkipException
-from datetime import timedelta, datetime
-import os
-import logging
-import subprocess
 from airflow.utils.trigger_rule import TriggerRule
+from datetime import timedelta, datetime
+import logging
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -31,12 +26,11 @@ with DAG(
     # every 3 hours
     schedule_interval="0 */6 * * *",  # every 6 hours
     start_date=datetime(2025, 9, 8),
-    max_active_runs=1,   # ⬅️ ensures only ONE run is active at a time
-    concurrency=1,       # ⬅️ ensures only ONE task across the DAG runs at once
+    max_active_runs=1,   # ensures only ONE run is active at a time
+    concurrency=1,       # ensures only ONE task across the DAG runs at once
     catchup=True,
     tags=['batch' ,'customer', 'events', 'pipeline', 'clickhouse' , 'spark', 'dbt', 'iceberg']
 ) as dag:
-
 
     dbt_run_stream_staging = BashOperator(
         task_id="dbt_run_stream_staging",
@@ -70,10 +64,9 @@ with DAG(
 
     dbt_run_customer_monthly_mart = BashOperator(
         task_id="dbt_run_customer_monthly_mart",
-        bash_command='docker exec dbt bash -c "cd /dbt && dbt run --models  customer_monthly_summary"',
+        bash_command='docker exec dbt bash -c "cd /dbt && dbt run --models customer_monthly_summary"',
         trigger_rule=TriggerRule.ALL_DONE,
     )
-
 
     create_s3_int_customer_profiles_ml = BashOperator(
     task_id="create_s3_int_customer_profiles_ml",
@@ -89,7 +82,6 @@ with DAG(
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
-    # -------------------
     # DAG Dependencies
     dbt_run_stream_staging >> dbt_run_stream_intermediate
     dbt_run_stream_intermediate >> dbt_run_funnel_mart
