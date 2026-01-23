@@ -2,9 +2,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-# -------------------------------
 # DAG default arguments
-# -------------------------------
 default_args = {
     'owner': 'airflow',
     'depends_on_past': True,
@@ -15,9 +13,7 @@ default_args = {
     'email': ['ziadashraf98765@gmail.com']
 }
 
-# -------------------------------
 # DAG definition
-# -------------------------------
 dag = DAG(
     'daily_customer_clustering_bash',
     default_args=default_args,
@@ -28,15 +24,12 @@ dag = DAG(
     tags=['customer groups', 'clustering', 'k-means', 'spark', 'bash' , 'iceberg']
 )
 
-# -------------------------------
 # BashOperator to trigger Spark job
-# -------------------------------
 run_spark_job = BashOperator(
     task_id='run_customer_clustering',
     bash_command="docker exec pyspark python /opt/spark/jobs/ml_clustering.py",
     dag=dag
 )
-
 
 monitor_customer_clustering = BashOperator(
 task_id = 'monitor_customer_clustering',
