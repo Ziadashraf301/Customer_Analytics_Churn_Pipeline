@@ -94,7 +94,7 @@ SMTP_PORT = 587
 SMTP_STARTTLS = True
 SMTP_SSL = False
 SMTP_USER = "ziadashraf98765@gmail.com"     # your Gmail
-SMTP_PASSWORD = "<redacted:SMTP_PASSWORD>"   # Not your Gmail password!
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")   # Not your Gmail password!
 SMTP_MAIL_FROM = "ziadashraf98765@gmail.com"
 
 # All reports/alerts will be sent here

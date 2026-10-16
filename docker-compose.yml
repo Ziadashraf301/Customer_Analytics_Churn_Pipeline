@@ -237,6 +237,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
       REDIS_HOST: superset_redis
       REDIS_PORT: 6379
       REDIS_CELERY_DB: 0
@@ -268,6 +269,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
       REDIS_HOST: superset_redis
       REDIS_PORT: 6379
       REDIS_CELERY_DB: 0
@@ -292,6 +294,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://superset:superset@postgres-superset:5432/superset_metadata
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
       REDIS_HOST: superset_redis
       REDIS_PORT: 6379
       REDIS_CELERY_DB: 0
