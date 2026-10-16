@@ -43,3 +43,13 @@ superset/superset_metadata_db_data/
 */logs/
 src/logs/
 *Data_Pipeline.drawio.html
+
+# --- secrets (added 2026-10-16) ---
+.env
+.env.*
+!.env.example
+!.env.example.*
+secrets/
+*.pem
+*service-account*.json
+*service_account*.json
